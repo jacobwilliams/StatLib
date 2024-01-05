@@ -1,0 +1,147 @@
+      SUBROUTINE LSTSQ(X, S, A, B, IFLAG, N, K, NWORK, ITMAX, EPS, EPS2,
+     *  W, XHAT, XKT, ITER, SUPDIF, IFAULT)
+      DIMENSION X(N), S(N, N), A(K, N), B(K), IFLAG(K), W(NWORK),
+     *  XHAT(N), XKT(K)
+C
+C        ALGORITHM AS225 APPL. STATIST. (1987) VOL. 36, NO. 2
+C
+C        COMPUTES THE LEAST-SQUARES PROJECTION OF X ONTO
+C        THE INTERSECTION OF K SIMULTANEOUS AFFINE CONSTRAINTS,
+C        USING THE MAHALANOBIS DISTANCE DETERMINED BY S.
+C        THE ITH CONSTRAINT IS OF THE FORM
+C        SUM OVER J OF A(I,J)*X(J) (.LE.,.EQ.) B(I)
+C        --.LE. IF IFLAG(I) .EQ. 0
+C        --.EQ. IF IFLAG(I) .EQ. 1
+C
+      DATA ZERO, TWO /0.0E0, 2.0E0/
+C
+      IFAULT = 0
+      NK = N * K
+      NK2 = NK + NK
+      NK2K = NK2 + K
+C
+C        CHECK INPUTS.
+C
+      IF (N .LE. 0 .OR. K .LE. 0 .OR. ITMAX .LE. 0 .OR. EPS .LE.
+     *  ZERO .OR. NWORK .LE. 0 .OR. EPS2 .LE. ZERO) GOTO 300
+      IF (NWORK .LT. NK2K + N) GOTO 320
+      DO 10 I = 1, K
+      IF (IFLAG(I) .EQ. 0 .OR. IFLAG(I) .EQ. 1) GOTO 10
+      GOTO 300
+   10 CONTINUE
+C
+C        INITIALIZE ARRAYS, AND COMPUTE
+C        MATRIX PRODUCTS A*S AND DIAG(A*S*A').
+C        WORKSPACE STRUCTURE IS AS FOLLOWS:
+C        W(1)-W(N*K):  ARRAY OF INCREMENT VECTORS.  ITH INC VECTOR
+C        IS (XKT(I)/2)*S*A(I,.).
+C        W(NK+1)-W(N*K*2):  MATRIX A*S.
+C        W(NK2+1)-W(NK2+K):  VECTOR DIAG(A*S*A').
+C        W(NK2K+1)-W(NK2K+N):  PREVIOUS XHAT VECTOR, TO CHECK FOR CONV.
+C
+      DO 40 I = 1, K
+      DO 30 J = 1, N
+      INDEX = NK + (J - 1) * K + I
+      W(INDEX) = ZERO
+      DO 20 L = 1, N
+   20 W(INDEX) = W(INDEX) + A(I, L) * S(L, J)
+   30 CONTINUE
+   40 CONTINUE
+      DO 60 I = 1, K
+      INDEX = NK2 + I
+      W(INDEX) = ZERO
+      DO 50 J = 1, N
+      IND2 = NK + (J - 1) * K + I
+      W(INDEX) = W(INDEX) + A(I, J) * W(IND2)
+   50 CONTINUE
+      IF (ABS(W(INDEX)) .LE. EPS2) GOTO 310
+   60 CONTINUE
+      DO 80 J = 1, N
+      INDEX = NK2K + J
+      W(INDEX) = X(J)
+      XHAT(J) = X(J)
+      DO 70 I = 1, K
+      INDEX = (I - 1) * N + J
+      W(INDEX) = ZERO
+   70 CONTINUE
+   80 CONTINUE
+      ITER = 0
+C
+C        THE ITERATION LOOP:  LINES 100-200.
+C
+  100 ITER = ITER + 1
+      SUPDIF = ZERO
+      DO 200 I = 1, K
+C
+C        REMOVE OLD INCREMENT VECTOR:
+C
+      DO 110 J = 1, N
+      INDEX = (I - 1) * N + J
+      XHAT(J) = XHAT(J) + W(INDEX)
+  110 CONTINUE
+C
+C        EVALUATE ITH CONSTRAINT:
+C
+      SUM = ZERO
+      DO 120 J = 1, N
+  120 SUM = SUM + A(I, J) * XHAT(J)
+      SUM = SUM - B(I)
+      IF (IFLAG(I) .EQ. 0 .AND. SUM .LE. ZERO) GOTO 140
+C
+C        COMPUTE NEW INCREMENT VECTOR THAT FORCES EQUALITY IN ITH CONST.
+C
+      INDEX = NK2 + I
+      TEMP = SUM / W(INDEX)
+      DO 130 J = 1, N
+      IND1 = (I - 1) * N + J
+      IND2 = NK + (J - 1) * K + I
+      W(IND1) = W(IND2) * TEMP
+      XHAT(J) = XHAT(J) - W(IND1)
+  130 CONTINUE
+      GOTO 160
+C
+C        IF CONSTRAINT WAS SATISFIED, SET INCREMENT TO ZERO:
+C
+  140 DO 150 J = 1, N
+      INDEX = (I - 1) * N + J
+      W(INDEX) = ZERO
+  150 CONTINUE
+C
+C        FIND LARGEST CHANGE, AND CHECK FOR CONVERGENCE:
+C
+  160 DO 170 J = 1, N
+      INDEX = NK2K + J
+      ABDIF = ABS(XHAT(J) - W(INDEX))
+      IF (SUPDIF .LT. ABDIF) SUPDIF = ABDIF
+  170 CONTINUE
+  200 CONTINUE
+      IF (SUPDIF .LE. EPS) GOTO 400
+      DO 210 J = 1, N
+      INDEX = NK2K + J
+      W(INDEX) = XHAT(J)
+  210 CONTINUE
+      IF (ITER .LT. ITMAX) GOTO 100
+      IFAULT = 1
+      RETURN
+  300 IFAULT = 2
+      RETURN
+  310 IFAULT = 3
+      RETURN
+  320 IFAULT = 4
+      RETURN
+C
+C        COMPUTE KUHN-TUCKER COEFFICIENTS AND RETURN.
+C
+  400 DO 430 I = 1, K
+C
+C        FIND A NON-ZERO DENOMINATOR:
+C
+      DO 410 J = 1, N
+      INDEX = NK + (J - 1) * K + I
+      IF (ABS(W(INDEX)) .GT. EPS2) GOTO 420
+  410 CONTINUE
+  420 IND2 = (I - 1) * N + J
+      XKT(I) = TWO * W(IND2) / W(INDEX)
+  430 CONTINUE
+      RETURN
+      END

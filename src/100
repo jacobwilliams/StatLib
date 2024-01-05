@@ -1,0 +1,105 @@
+CSTART OF AS 100
+      REAL FUNCTION AJV(SNV, ITYPE, GAMMA, DELTA, XLAM, XI, IFAULT)
+C
+C        ALGORITHM AS 100.1  APPL. STATIST. (1976) VOL.25, P.190
+C
+C        CONVERTS A STANDARD NORMAL VARIATE (SNV) TO A
+C        JOHNSON VARIATE (AJV)
+C
+      REAL SNV, GAMMA, DELTA, XLAM, XI, V, W, ZERO, HALF, ONE,
+     $  ZABS, ZEXP, ZSIGN
+C
+      DATA ZERO, HALF, ONE /0.0, 0.5, 1.0/
+C
+      ZABS(W) = ABS(W)
+      ZEXP(W) = EXP(W)
+      ZSIGN(W, V) = SIGN(W, V)
+C
+      AJV = ZERO
+      IFAULT = 1
+      IF (ITYPE .LT. 1 .OR. ITYPE .GT. 4) RETURN
+      IFAULT = 0
+      GOTO (10, 20, 30, 40), ITYPE
+C
+C        SL DISTRIBUTION
+C
+   10 AJV = XLAM * ZEXP((XLAM * SNV - GAMMA) / DELTA) + XI
+      RETURN
+C
+C        SU DISTRIBUTION
+C
+   20 W = ZEXP((SNV - GAMMA) / DELTA)
+      W = HALF * (W - ONE / W)
+      AJV = XLAM * W + XI
+      RETURN
+C
+C        SB DISTRIBUTION
+C
+   30 W = (SNV - GAMMA) / DELTA
+      V = ZEXP(-ZABS(W))
+      V = (ONE - V) / (ONE + V)
+      AJV = HALF * XLAM * (ZSIGN(V, W) + ONE) + XI
+      RETURN
+C
+C        NORMAL DISTRIBUTION
+C
+   40 AJV = (SNV - GAMMA) / DELTA
+      RETURN
+      END
+C
+      REAL FUNCTION SNV(AJV, ITYPE, GAMMA, DELTA, XLAM, XI, IFAULT)
+C
+C        ALGORITHM AS 100.2  APPL. STATIST. (1976) VOL.25, P.190
+C
+C        CONVERTS A JOHNSON VARIATE (AJV) TO A
+C        STANDARD NORMAL VARIATE (SNV)
+C
+      REAL AJV, GAMMA, DELTA, XLAM, XI, V, W, C, ZERO, HALF, ONE,
+     $  ZLOG, ZSQRT
+C
+      DATA ZERO, HALF, ONE, C /0.0, 0.5, 1.0, -63.0/
+C
+      ZLOG(W) = ALOG(W)
+      ZSQRT(W) = SQRT(W)
+C
+      SNV = ZERO
+      IFAULT = 1
+      IF (ITYPE .LT. 1 .OR. ITYPE .GT. 4) RETURN
+      IFAULT = 0
+      GOTO (10, 20, 30, 40), ITYPE
+C
+C        SL DISTRIBUTION
+C
+   10 W = XLAM * (AJV - XI)
+      IF (W .LE. ZERO) GOTO 15
+      SNV = XLAM * (ZLOG(W) * DELTA + GAMMA)
+      RETURN
+   15 IFAULT = 2
+      RETURN
+C
+C        SU DISTRIBUTION
+C
+   20 W = (AJV - XI) / XLAM
+      IF (W .GT. C) GOTO 23
+      W = -HALF / W
+      GOTO 27
+   23 W = ZSQRT(W * W + ONE) + W
+   27 SNV = ZLOG(W) * DELTA + GAMMA
+      RETURN
+C
+C        SB DISTRIBUTION
+C
+   30 W = AJV - XI
+      V = XLAM - W
+      IF (W .LE. ZERO .OR. V .LE. ZERO) GOTO 35
+      SNV = ZLOG(W / V) * DELTA + GAMMA
+      RETURN
+   35 IFAULT = 2
+      RETURN
+C
+C        NORMAL DISTRIBUTION
+C
+   40 SNV = DELTA * AJV + GAMMA
+      RETURN
+      END
+CEND OF AS 100

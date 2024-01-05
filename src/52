@@ -1,0 +1,44 @@
+CSTART OF AS 52
+      SUBROUTINE MOMNTS(X, K, N, S1, S2, S3, S4, IFAULT)
+C
+C        ALGORITHM AS 52  APPL. STATIST. (1972) VOL.21, P.226
+C
+C        ADDS A NEW VALUE, X, WHEN CALCULATING A MEAN, AND SUMS
+C        OF POWERS OF DEVIATIONS. N IS THE CURRENT NUMBER OF
+C        OBSERVATIONS, AND MUST BE SET TO ZERO BEFORE FIRST ENTRY
+C
+      REAL X, S1, S2, S3, S4, AN, AN1, DX, DX2, ZERO, ONE, TWO,
+     $  THREE, FOUR, SIX
+      DATA ZERO, ONE, TWO, THREE, FOUR, SIX
+     $     /0.0, 1.0, 2.0,   3.0,  4.0, 6.0/
+C
+      IF (K .GT. 0 .AND. K .LT. 5 .AND. N .GE. 0) GOTO 10
+      IFAULT = 1
+      RETURN
+   10 IFAULT = 0
+      N = N + 1
+      IF (N .GT. 1) GOTO 20
+C
+C        FIRST ENTRY, SO INITIALISE
+C
+      S1 = X
+      S2 = ZERO
+      S3 = ZERO
+      S4 = ZERO
+      RETURN
+C
+C        SUBSEQUENT ENTRY, SO UPDATE
+C
+   20 AN = N
+      AN1 = AN - ONE
+      DX = (X - S1) / AN
+      DX2 = DX * DX
+      GOTO (60, 50, 40, 30), K
+   30 S4 = S4 - DX * (FOUR * S3 - DX * (SIX * S2 + AN1 *
+     $  (ONE + AN1 ** 3) * DX2))
+   40 S3 = S3 - DX * (THREE * S2 - AN * AN1 * (AN - TWO) * DX2)
+   50 S2 = S2 + AN * AN1 * DX2
+   60 S1 = S1 + DX
+      RETURN
+      END
+CEND OF AS 52

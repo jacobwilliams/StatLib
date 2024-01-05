@@ -1,0 +1,191 @@
+      SUBROUTINE RPCORM(NX, N, D, C, U, A, M, ISEED, IFAULT)
+C
+C        ALGORITHM AS213 APPL. STATIST. (1985) VOL. 34, NO. 2.
+C        THIS ALGORITHM RANDOMLY SELECTS A CORRELATION MATRIX FROM THE
+C        CLASS OF ALL CORRELATION MATRICES WITH SPECIFIED EIGENVALUES
+C
+      REAL D(NX), C(NX, NX), U(NX), A(NX, NX)
+      INTEGER M(NX, 3)
+      DATA EPS /0.00001/
+      DATA ZERO, ONE, TWO, FOUR, ZP25, ZP5 /0.0, 1.0, 2.0, 4.0, 0.25,
+     *  0.5/
+C
+      IFAULT = 0
+      IF(N .GT. 0) GOTO 40
+   10 IFAULT = 1
+      RETURN
+   20 IFAULT = 2
+      RETURN
+   30 IFAULT = 3
+      RETURN
+   40 IF(N .GT. NX) GOTO 10
+      TT = ZERO
+      DO 60 I = 1, N
+      IF(D(I)  .LT. ZERO) GOTO 10
+      TT = TT + D(I)
+      DO 50 J = 1, N
+   50 A(I, J) = ZERO
+      A(I, I) = ONE
+   60 CONTINUE
+      IF (ABS(TT - FLOAT(N)) .GT.  EPS * FLOAT(N)) GOTO 10
+C
+C        GENERATE AN ORTHOGONAL MATRIX A FROM THE INVARIANT MEASURE ON
+C        THE GROUP OF ORTHOGONAL MATRICES.  CONSTRUCT A ONE COLUMN AT
+C        A TIME.
+C
+      DO 300 L = 1, N
+      NMLP1 = N - L + 1
+      CALL GGNOR(ISEED, NMLP1, U(L))
+      IF(L .EQ. N) GOTO 260
+      SS = ZERO
+      DO 120 I = L, N
+  120 SS = SS + U(I) * U(I)
+      UL = SQRT(SS)
+      IF(UL .EQ. ZERO) GOTO 20
+C
+C        CALCULATE LENGTH OF U AND STORE IT IN UL.  RANDOMLY CHOSE
+C        SIGN OF UL TO PREVENT LOSS OF SIGNIFICANCE IN VL.
+C
+      UL = SIGN(UL, -U(L))
+C
+C        PROJECT U ONTO ORTHOGONAL COMPLEMENT OF FIRST L-1 COLUMNS OF
+C        A, NORMALIZE AND STORE THE PROJECTION IN L-TH COLUMN OF A.
+C        CALCULATE PROJECTION MATRIX FOR ORTHOGONAL COMPLEMENT OF
+C        FIRST L COLUMNS OF A AND STORE IT IN LAST N-L COLUMNS OF A.
+C
+      LP1 = L + 1
+      VL = UL - U(L)
+      DO 250 I = 1, N
+      TT = ZERO
+      DO 230 J = L, N
+  230 TT = TT + A(I, J) * U(J)
+      HV = TT / UL
+      HW = (HV - A(I, L)) / VL
+      A(I, L) = HV
+      DO 240 J = LP1, N
+  240 A(I, J) = A(I, J) - HW * U(J)
+  250 CONTINUE
+C
+C        ASSIGN RANDOM ORIENTATION TO L-TH COLUMN OF A.
+C
+  260 IF(U(L) .GT. ZERO) GOTO 300
+      DO 270 I = 1, N
+  270 A(I, L) = -A(I, L)
+  300 CONTINUE
+C
+C        COMPUTE RANDOM COVARIANCE MATRIX C=ADA'
+C
+      DO 310 J = 1, N
+      DO 310 I = J, N
+      C(I, J) = ZERO
+      DO 305 K = 1, N
+  305 C(I, J) = C(I, J) + A(I, K) * D(K) * A(J, K)
+  310 CONTINUE
+      DO 315 J = 2, N
+      JM1 = J - 1
+      DO 315 I = 1, JM1
+      C(I, J) = C(J, I)
+  315 CONTINUE
+C
+C        RANDOMLY SELECT TWO DIAGONAL ELEMENTS OF C, ONE GREATER THAN
+C        ONE AND THE OTHER LESS THAN ONE, THEN CONSTRUCT THE APPRO-
+C        PRIATE 2X2 ROTATIONAL MATRIX WHICH SETS ONE DIAGNOL ELEMENT
+C        EQUAL TO ONE WHILE MAINTAINING THE STRUCTURE OF EIGENVALUES
+C
+      NK = 0
+      DO 320 I = 1, N
+      IF(ABS(C(I, I) - ONE)  .GT.  EPS) GOTO 320
+      NK = NK + 1
+      M(NK, 1) = I
+  320 CONTINUE
+      NM = N - NK - 1
+      IF(NM .EQ. -1) RETURN
+      IF(NM .EQ. 0) GOTO 30
+      SUM = ZERO
+      DO 400 NN = 1, NM
+      IG = 0
+      IL = 0
+      DO 350 K = 1, N
+C
+C        M(.,1), M(.,2) AND M(.,3) STORE INDICES OF DIAGONAL ELEMENTS
+C        OF C WHICH ARE .EQ. ONE, .GT. ONE, AND .LT. ONE RESPECTIVELY
+C
+      DO 330 KK = 1, NK
+      IF (K .EQ. M(KK, 1)) GOTO 350
+  330 CONTINUE
+      IF (C(K, K) .GT. (ONE + EPS)) GOTO 340
+      IL = IL + 1
+      M(IL, 3) = K
+      GOTO 350
+  340 IG = IG + 1
+      M(IG, 2) = K
+  350 CONTINUE
+      IF (IL * IG .EQ. 0) GOTO 30
+      II = INT(GGUBF(ISEED) * IG) + 1
+      JJ = INT(GGUBF(ISEED) * IL) + 1
+      I1 = M(II, 2)
+      J1 = M(JJ, 3)
+      I = MIN0(I1, J1)
+      J = MAX0(I1, J1)
+      IF (ABS(C(I, I) - ONE) .LE. EPS) GOTO 390
+C
+C        SOLVE THE QUADRATIC EQUATION AND DETERMINE THE ROTATION ANGLE
+C
+      CII = C(I, I)
+      CIJ = C(I, J)
+      CJJ = C(J, J)
+      CIIMJJ = CII - CJJ
+      CIIPJJ = CII + CJJ - TWO
+      CIJIJ = CIJ * CIJ
+      CA = CIJIJ + ZP25 * CIIMJJ * CIIMJJ
+      CB = ZP5 * CIIPJJ * CIIMJJ
+      CC = ZP25 * CIIPJJ * CIIPJJ - CIJIJ
+      DT = SQRT(CB * CB - FOUR * CA * CC)
+C
+C        RANDOMLY SELECT ONE OF THE TWO POSSIBLE SOLUTIONS
+C
+      IF (GGUBF(ISEED) .GE. ZP5) DT = -DT
+      THETA = ARCOS(ZP5 * (-CB + DT) / CA) / TWO
+      CS = COS(THETA)
+      SN = SIN(THETA)
+C
+C        CHOOSE THE CORRECT DIRECTION OF ROTATION
+C
+      IF (ABS(CS * CS * CII + SN * SN * CJJ + TWO * CS * SN * CIJ - ONE)
+     *  .GT. EPS) SN = -SN
+C
+C        COMPUTE C=PCP' USING THE FACT THAT P IS A ROTATIONAL
+C        MATRIX WITH THE ROTATION BEING OPERATED BY 2 X 2 MATRIX
+C        (CS SN) / (-SN CS).  ONLY ELEMENTS OF I AND J-TH ROWS
+C        (HENCE COLUMNS) OF C ARE CHANGED BY THE ROTATION.
+C
+      DO 360 II = 1, N
+      DO 360 JJ = 1, N
+  360 A(II, JJ) = C(II, JJ)
+      A(I, I) = CS * CS * CII + SN * SN * CJJ + TWO * CS * SN * CIJ
+      IF(ABS(A(I, I) - ONE)  .GT. EPS) GOTO 30
+      M(NN, 1) = I
+      NK = NK + 1
+      A(J, J) = CS * CS * CJJ + SN * SN * CII - TWO * CS * SN * CIJ
+      A(J, I) = (CS * CS - SN * SN) * CIJ + CS * SN * (CJJ - CII)
+      A(I, J) = A(J, I)
+      DO 370 L = 1, N
+      IF(L .EQ. I .OR. L .EQ. J) GOTO 370
+      A(I, L) = CS * C(I, L) + SN * C(J, L)
+      A(J, L) = -SN * C(I, L) + CS * C(J, L)
+      A(L, I) = A(I, L)
+      A(L, J) = A(J, L)
+  370 CONTINUE
+      DO 380 II = 1, N
+      DO 380 JJ = 1, N
+  380 C(II, JJ) = A(II, JJ)
+  390 SUM = SUM + C(I, I)
+  400 CONTINUE
+C
+C        SET THE REMAINING DIAGONAL ELEMENT TO BE (N-SUM) AND
+C        SEE IF IT IS WITHIN THE SPECIFIED PRECISION LIMIT
+C
+      C(N, N) = FLOAT(N) - SUM
+      IF(ABS(C(N, N) - ONE)  .GT. EPS) GOTO 30
+      RETURN
+      END

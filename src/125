@@ -1,0 +1,268 @@
+C UKC NETLIB DISTRIBUTION COPYRIGHT 1990 RSS
+C
+        SUBROUTINE CVSUR1(N, M, L, MM, U, A, Z, IROWS, ITERS, F, THETA,
+     *  VAR, CRI1, CRI2, F0, DF1, DF2, DDF1, DDF2, IFAULT)
+C
+C         ALGORITHM AS 125 APPL. STATIST. (1978) VOL.27, NO.2
+C
+C         THIS SUBROUTINE USES A NEWTON-RAPHSON ITERATION TO DETERMINE
+C         THE MAXIMUM LIKELIHOOD ESTIMATES FOR AN EXPONENTIAL COVARIATE
+C         SURVIVAL MODEL.
+C
+C  as r38 vol 30 no 3 1981 p 355 -- code changes included
+C
+C	Auxiliary routines required: CHOL = AS6, SYMINV = AS7
+C
+        DIMENSION U(N), A(N), Z(IROWS, M), THETA(L), DF1(L), DF2(L),
+     *  VAR(MM), DDF1(MM), DDF2(MM)
+        PARAMETER (ZERO=0.0, ONE=1.0)
+C
+        IFAULT = 3
+        IF (N .LT. 1) GOTO 160
+        IFAULT = 4
+        IF (M .LT. 1) GOTO 160
+C
+C         FLAST PRERESENTS THE FALUE OF THE LOG LIKELIHOOD FUNCTION
+C         FOR THE PREVIOUS ITERATION.
+C
+        FLAST = ZERO
+        R = ZERO
+        W = ZERO
+        DO 10 I = 1, N
+          IFAULT = 5
+          AI = A(I)
+          IF (AI .NE. ZERO .AND. AI .NE. ONE) GOTO 160
+C
+C         R IS THE NUMBER OF UNCENSORED OBSERVATIONS
+C         W IS THE TOTAL OBSERVED TIME
+C
+          R = R + AI
+          IFAULT = 6
+          IF (U(I) .LT. ZERO) GOTO 160
+          W = W + U(I)
+10      CONTINUE
+        IFAULT = 7
+        IF (R .EQ. ZERO) GOTO 160
+        IFAULT = 8
+        IF (W .EQ. ZERO) GOTO 160
+        IFAULT = 9
+        IF (R .LT. FLOAT(L)) GOTO 160
+C
+C         THETA(L) CONTAINS THE ESTIMATE OF ALPHA,
+C         INITIALIZE TO ITS MAXIMUM LIKELIHOOD ESTIMATE
+C         VALUE FOR NONCOVARIATE CASE.
+C
+        THETA(L) = ALOG(R / W)
+C
+C         COMPUTE F0, THE MAXIMIZED LOG LIKELIHOOD WHEN
+C         ALL BETAS ARE ZERO.
+C
+        F0 = -R + R * THETA(L)
+C
+C         INITIALIZE AND COMPUTE ZSUM AND STORE IN FIRST
+C         M ELEMENTS OF ARRAY VAR.
+C
+        DO 30 J = 1, M
+          THETA(J) = ZERO
+          VARJ = ZERO
+          DO 20 I = 1, N
+            VARJ = VARJ + Z(I, J) * A(I)
+20        CONTINUE
+          VAR(J) = VARJ
+30      CONTINUE
+C
+C         BEGIN ITERATING
+C
+        DO 60 K = 1, ITERS
+          CALL CVSUR2(N, M, L, MM, U, A, R, Z, IROWS, VAR, THETA, F, 
+     *    DF1, DDF1)
+C
+C         DETERMINE WHETHER THE RELATIVE CHANGE IN LOG LIKELIHOODS IS
+C         LESS THAN CRI1 OR NOT AND SET ICODE1 = 0, 1 ACCORDINGLY.
+C
+          ICODE1 = 1
+          DIFF = F - FLAST
+          FCRI1 = FLAST * CRI1
+          IF (DIFF .LE. -FCRI1 .AND. DIFF .GE. ZERO) ICODE1 = 0
+          FLAST = F
+C
+C         FIND THE CHOLESKY DECOMPOSITION OF DDF1 AND RETURN
+C         RESULTS IN DDF2.
+C
+          CALL CHOL(DDF1, L, DDF2, NULLTY, IFAULT)
+          IF (IFAULT .NE. 0) GOTO 160
+C
+C         SOLVE THE LINEAR SYSTEM DDF1 * X = DF1.
+C         X IS RETURNED IN DF2 AND REPRESENTS THE INCREMENT
+C         IN THE MLE ESTIMATES.
+C
+          CALL SOLVE(DDF2, DF2, DF1, L, MM, IER)
+          IFAULT = 2
+          IF (IER .EQ. 1) GOTO 160
+C
+C         IF ICODE1 = 1, F HAS NOT CONVERGED.
+C
+          IF (ICODE1 .EQ. 1) GOTO 45
+C
+C         SET ICODE2 = 1 IF THE RELATIVE CHANGE IN ANY THETA
+C         IS GREATER THAN OR EQUAL TO CRI2 AND 0 OTHERWISE.
+C
+          ICODE2 = 0
+          DO 40 J = 1, L
+            IF (ABS(DF2(J)) .GE. ABS(THETA(J)) * CRI2) ICODE2 = 1
+40        CONTINUE
+C
+C         FOR CONVERGENCE TO BE REACHED, BOTH THE RELATIVE CHANGE IN
+C         SUCCESSIVE MLES MUST BE LESS THAN CRI2 AND THE RELATIVE
+C         CHANGE IN SUCCESSIVE LOG LIKELIHOODS MUST BE LESS THAN CRI1.
+C
+          IF (ICODE1 .EQ. 0 .AND. ICODE2 .EQ. 0) GOTO 70
+C
+C         CONVERGENCE WAS NOT REACHED.
+C         FIND NEW VALUES OF THETA AND BEGIN NEXT ITERATION.
+C
+45        DO 50 J = 1, L
+            THETA(J) = THETA(J) + DF2(J)
+50        CONTINUE
+60      CONTINUE
+C
+C         CONVERGENCE WAS NOT REACHED IN ITERS ITERATIONS
+C
+        IFAULT = 1
+        GOTO 160
+70      ITERS = K
+        IFAULT = 0
+C
+C         CONVERGENCE WAS REACHED IN K ITERATIONS.
+C
+        CALL CVSUR2(N, M, L, MM, U, A, R, Z, IROWS, VAR,
+     *  THETA, F, DF2, DDF2)
+        CALL SYMINV(DDF2, L, VAR, U, NULLTY, IFAULT)
+160     RETURN
+        END
+C
+C
+        SUBROUTINE CVSUR2(N,M,L,MM,U,WORK,R,Z,IROWS,ZSUM,THETA,
+     *  F, DF, DDF)
+C
+C         ALGORITHM AS 125.1 APPL. STATIST. (1978) VOL.27, NO.2
+C
+C       THIS SUBROUTINE CALCULATES THE LOG LIKELIHOOD (F), FIRST
+C       DERIVATIVE ARRAY (DF), AND (-1)*SECOND DERIVATIVE MATRIX (DDF).
+C       THE ELEMENTS OF DDF ARE IN SYMMETRIC STORAGE MODE.
+C
+        DIMENSION U(N), Z(IROWS, M), ZSUM(M), THETA(L), DF(L), DDF(MM),
+     *  WORK(N)
+        PARAMETER (ZERO=0.0)
+C
+        ETHETA = EXP(THETA(L))
+        UEPROD = ZERO
+        ZPROD = ZERO
+        DO 20 J = 1, M
+          ZPROD = ZPROD + THETA(J) * ZSUM(J)
+20      CONTINUE
+        DO 40 I = 1, N
+          WORK(I) = ZERO
+C
+C         CALCULATE LOG LIKELIHOOD
+C         THETA(1) - THETA(M) CONTAIN BETA ESTIMATES
+C         THETA(M+1) CONTAINS THE ESTIMATE OF ALPHA.
+C
+          DO 30 J = 1, M
+            WORK(I) = WORK(I) + THETA(J) * Z(I, J)
+30        CONTINUE
+          WORK(I) = EXP(WORK(I))
+          UEPROD = UEPROD + U(I) * WORK(I)
+40      CONTINUE
+        F = R * THETA(L) + ZPROD - ETHETA * UEPROD
+C
+C         CALCULATE FIRST DERIVATIVE ARRAY DF.
+C         FROM HERE THROUGH STATEMENT 60, DDF IS USED AS A WORK ARRAY
+C
+        TERM1 = -ETHETA * UEPROD
+        DF(L) = R + TERM1
+        DO 60 J = 1, M
+          DDF(J) = ZERO
+          DO 50 I = 1, N
+            DDF(J) = DDF(J) + U(I) * Z(I, J) * WORK(I)
+50        CONTINUE
+          DDF(J) = -ETHETA * DDF(J)
+          DF(J) = ZSUM(J) + DDF(J)
+60      CONTINUE
+C
+C         CALCULATE (-1)*SECOND DERIVATIVE ARRAY DDF
+C
+        KK = (L - 1) * L / 2
+        DO 70 J = 1, M
+          KK = KK + 1
+          DDF(KK) = -DDF(J)
+70      CONTINUE
+        DDF(MM) = -TERM1
+        KK = 0
+        DO 85 J = 1, M
+          DO 80 K = 1, J
+            KK = KK + 1
+            DDF(KK) = ZERO
+            DO 75 I = 1, N
+              DDF(KK) = DDF(KK) + U(I) * Z(I, J) * Z(I, K) * WORK(I)
+75          CONTINUE
+            DDF(KK) = ETHETA * DDF(KK)
+80        CONTINUE
+85      CONTINUE
+        RETURN
+        END
+C
+C
+        SUBROUTINE SOLVE(A, X, B, N, NN, IFAULT)
+C
+C         ALGORITHM AS 125.2 APPL. STATIST. (1978) VOL.27, NO.2
+C
+C         THIS SOLVES THE LINEAR SYSTEM L*(L-TRANSPOSE)*X=B,
+C         WHERE L IS A LOWER TRIANGULAR MATRIX WITH POSITIVE
+C         DIAGONALS.  THE ELEMENTS OF L ARE STORED IN ARRAY A
+C         IN THE FOLLOWING ORDER - L(1,1), L(2,1), L(2,2),
+C         L(3,1), L(3.2),.....
+C         X AND B COULD OCCUPY THE SAME LOCATIONS, BUT THIS IS
+C         PROHIBITED BY THE FORTRAN STANDARD (SECTION 8.4.2)
+C
+	PARAMETER (ZERO=0.0)
+        DIMENSION A(NN), X(N), B(N)
+C
+C         SOLVE LW = B FOR W AND PUT RESULT IN X.
+C
+        IF (A(1) .LE. ZERO) GOTO 50
+        X(1) = B(1) / A(1)
+        IF (N .EQ. 1) GOTO 25
+        DO 20 J = 2, N
+          J1 = (J -1) * J / 2
+          SUM = B(J)
+          JM1 = J - 1
+          DO 10 I = 1, JM1
+            I1 = J1 + I
+            SUM = SUM - A(I1) * X(I)
+10        CONTINUE
+          I1 = J1 + J
+          IF (A(I1) .LE. ZERO) GOTO 50
+          X(J) = SUM / A(I1)
+20      CONTINUE
+C
+C         SOLVE (L-TRANSPOSE)*W = X AND PUT RESULT IN X
+C
+25      X(N) = X(N) / A(NN)
+        IF (N .EQ. 1) GOTO 45
+        DO 40 JJ = 2, N
+          J = N - JJ + 1
+          SUM = X(J)
+          JP1 = J + 1
+          DO 30 I = JP1, N
+            I1 = (I -1) * I / 2 + J
+            SUM = SUM - A(I1) * X(I)
+30        CONTINUE
+          I1 = J * (J + 1) / 2
+          X(J) = SUM / A(I1)
+40      CONTINUE
+45      IFAULT = 0
+        RETURN
+50      IFAULT = 1
+        RETURN
+        END

@@ -1,0 +1,188 @@
+CSTART OF AS 45
+      SUBROUTINE HISTGM(IWRITE, IWIDTH, FREQ, DAT, NN, MM,
+     $  LENG, IND, IFAULT)
+C
+C        ALGORITHM AS 45  APPL. STATIST. (1971) VOL.20, P.332
+C
+C        GIVEN A VECTOR OF FREQUENCIES, OR A VECTOR OF RAW DATA,
+C        A HISTOGRAM IS PLOTTED SHOWING THE FREQUENCY DISTRIBUTION
+C
+      DIMENSION IOUT(28), OUT(28), DAT(NN), FREQ(MM)
+      INTEGER FREQ, SCALE
+      LOGICAL IND
+C
+C        DEFINE CHARACTERS FOR PRINTING, AND MAGNITUDE OF
+C        SMALLEST ACCEPTABLE NUMBER.
+C
+      DATA IBLANK, ISTAR, IDASH /1H , 1H*, 1H-/
+      DATA ETA /1.0E-38/
+C
+    1 FORMAT(6H EACH , A1, 8H EQUALS , I4, 7H POINTS /)
+    2 FORMAT(1H , I8, 3X, 28(4X, A1))
+    3 FORMAT(12H INTERVAL  ), 14(F8.3, 2X))
+    4 FORMAT(12H MID-POINTS), 5X, 14(F8.3, 2X))
+    5 FORMAT(24H0THE PRINTED VALUES MUST/ 22H BE MULTIPLIED BY 10**, I3)
+    6 FORMAT(12H0FREQUENCY  , 28I5)
+    7 FORMAT(1H , 120A1)
+    8 FORMAT(16H CELLS COMBINED,, I3, 3H AT / 21H A TIME, TO FIT WIDTH)
+C
+C        CHECK INPUT PARAMETERS AND TYPE OF INPUT
+C
+      IFAULT = 0
+      IF (MM .GT. 28 .OR. IWIDTH .LT. 26) IFAULT = 1
+      M = MM
+      N = NN
+      K = (IWIDTH - 15) / 5
+      IF (M .GT. K .AND. IND) M = K
+      LENGTH = LENG - 10
+      IF (LENGTH .LE. 0) IFAULT = 2
+      IF (IFAULT .NE. 0) RETURN
+      FM = M
+      IF (IND) GOTO 15
+      IF (M .LE. K) GOTO 120
+      KEY = M / K
+      IF (K * KEY .NE. M) KEY = KEY + 1
+      L = 1
+      DO 10 I = 1, K
+      IOUT(I) = 0
+      DO 10 J = 1, KEY
+      IOUT(I) = IOUT(I) + FREQ(L)
+      L = L + 1
+      IF (L .GT. M) GOTO 12
+   10 CONTINUE
+   12 M = I
+      DO 14 I = 1, M
+   14 FREQ(I) = IOUT(I)
+      WRITE (IWRITE, 8) KEY
+      GOTO 120
+C
+C        DEFINE A SUITABLE SCALE
+C
+   15 DO 20 I = 1, M
+   20 FREQ(I) = 0
+      XMIN = DAT(1)
+      XMAX = XMIN
+      DO 30 I = 2, N
+      DT = DAT(I)
+      IF (DT .LT. XMIN) XMIN = DT
+      IF (DT .GT. XMAX) XMAX = DT
+   30 CONTINUE
+      IF (XMAX - XMIN .GE. ETA * FM) GOTO 35
+      IFAULT = 3
+      RETURN
+   35 KEY = 1
+      KOUNT = 0
+   40 R = XMAX - XMIN
+      B = XMIN
+   50 IF (R .GT. 1.0) GOTO 60
+      KOUNT = KOUNT + 1
+      R = R * 10.0
+      GOTO 50
+   60 IF (R .LE. 10.0) GOTO 70
+      KOUNT = KOUNT - 1
+      R = R / 10.0
+      GOTO 60
+   70 IF (KEY .GT. 2) GOTO 80
+      TK = 10.0 ** KOUNT
+      B = B * TK
+      IF (B .LT. 0.0 .AND. B .NE. AINT(B)) B = B - 1.0
+      B = AINT(B) / TK
+      R = (XMAX - B) / FM
+      KOUNT = 0
+      KEY = KEY + 2
+      GOTO 50
+   80 STEP = AINT(R)
+      IF (STEP .NE. R) STEP = STEP + 1.0
+      IF (R .LT. 1.5) STEP = STEP - 0.5
+      STEP = STEP / 10.0 ** KOUNT
+      IF (KEY .EQ. 4) GOTO 90
+      IF (XMAX - XMIN .GT. 0.8 * FM * STEP) GOTO 90
+      KOUNT = 1
+      KEY = 2
+      GOTO 40
+   90 XMIN = B
+      C = STEP * AINT(B / STEP)
+      IF (C .LT. 0.0 .AND. C .NE. B) C = C - STEP
+      IF (C + FM * STEP .GE. XMAX) XMIN = C
+C
+C        CALCULATE FREQUENCIES FOR EACH INTERVAL
+C
+      DO 110 I = 1, N
+      J = (DAT(I) - XMIN) / STEP + 1.0
+      FREQ(J) = FREQ(J) + 1
+  110 CONTINUE
+C
+C        PRINT FREQUENCY VECTOR
+C
+  120 WRITE (IWRITE, 6) (FREQ(I), I = 1, M)
+      LINE = M * 5 + 15
+      WRITE (IWRITE, 7) (IDASH, I = 1, LINE)
+C
+C        FIND LARGEST FREQUENCY AND SCALE IF NECESSARY
+C
+      MAX = 0
+      DO 130 I = 1, M
+      IF (FREQ(I) .GT. MAX) MAX = FREQ(I)
+  130 CONTINUE
+      SCALE = 1
+      DIV = 1.0
+      IF (MAX .LE. LENGTH) GOTO 140
+      SCALE = (MAX + LENGTH - 1) / LENGTH
+      WRITE (IWRITE, 1) ISTAR, SCALE
+      DIV = 1.0 / FLOAT(SCALE)
+C
+C        CLEAR OUTPUT TO BLANKS
+C
+  140 DO 150 I = 1, M
+  150 IOUT(I) = IBLANK
+C
+C        FOR EACH LINE OF PRINT, PLACE OUTPUT CHARACTERS IN
+C        THEIR APPROPRIATE POSITIONS IN THE OUTPUT VECTOR
+C
+      MAX = FLOAT(MAX) * DIV + 0.5
+      DO 170 I = 1, MAX
+      K = MAX + 1 - I
+      DO 160 J = 1, M
+      INDEX = FLOAT(FREQ(J)) * DIV + 0.5
+      IF (INDEX .EQ. K) IOUT(J) = ISTAR
+  160 CONTINUE
+      L = K * SCALE
+C
+C        PRINT LINE OF FREQUENCIES
+C
+      WRITE (IWRITE, 2) L, (IOUT(J), J = 1, M)
+  170 CONTINUE
+      WRITE (IWRITE, 7) (IDASH, I = 1, LINE)
+      IF (.NOT. IND) RETURN
+C
+C        COMPUTE INTERVAL MID-POINTS AND SCALE IF NECESSARY
+C
+      K = 0
+      XMIN = XMIN + STEP * 0.5
+      XMAX = XMIN + STEP * FLOAT(M - 1)
+      XM = AMIN1(ABS(XMIN), ABS(XMAX))
+      IF (XM .LT. ETA) XM = XM + STEP
+  180 IF (XM .GE. 0.1) GOTO 190
+      K = K + 1
+      XM = XM * 10.0
+      GOTO 180
+  190 XM = AMAX1(XMAX, -XMIN)
+  200 IF (XM .LT. 1000.0) GOTO 210
+      K = K - 1
+      XM = XM / 10.0
+      GOTO 200
+  210 TK = 10.0 ** K
+      STEP = STEP * TK
+      OUT(1) = XMIN * TK
+      DO 220 I = 2, M
+  220 OUT(I) = OUT(I - 1) + STEP
+C
+C        PRINT INTERVAL MID-POINTS
+C
+      WRITE (IWRITE, 3) (OUT(J), J = 1, M, 2)
+      WRITE (IWRITE, 4) (OUT(J), J = 2, M, 2)
+      K = -K
+      IF (K .NE. 0) WRITE (IWRITE, 5) K
+      RETURN
+      END
+CEND OF AS 45

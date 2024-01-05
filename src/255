@@ -1,0 +1,260 @@
+'procedure' twoway(nrows, ncols, include, resval, baseval, rowval,
+    colval, rxcval, init, rcfit, xfit, test, nsteps, evalue, ifault);
+'comment' Algorithm AS 255.1  Appl. Statist. (1990) Vol.39, No.2;
+'value' nrows, ncols, init, rcfit, xfit, evalue;
+'integer' nrows, ncols, nsteps, ifault; 'Boolean' init, rcfit, xfit;
+'real' baseval, rxcval, evalue; 'Boolean' 'array' include;
+'real' 'array' resval, rowval, colval; 'Boolean' 'procedure' test;
+'comment' Fits a two-dimensional array of numerical values to an 
+    additive model incorporating a row term, a column term, and 
+    an optional nonadditivity term;
+    'begin' 'integer' row, col, s0;
+    'real' sx, sy, sx2, sy2, sxy, rxctemp, xm, ym, newres, ssval, changeval;
+
+    'procedure' faultexit(i);
+    'value' i; 'integer' i;
+    'comment' Local procedure to exit on fault;
+        'begin' 
+        ifault := i; 'goto' exit
+        'end' faultexit;
+
+    'procedure' initcalc;
+    'comment' Local procedure to initialise the twoway model;
+        'begin' 'integer' firstrow, lastrow, firstcol, lastcol, localrow, ndata;
+        ndata := 0;
+        'for' row := 1 'step' 1 'until' nrows 'do' 
+            'begin' 
+            firstcol := 0;
+            'for' col := 1 'step' 1 'until' ncols 'do' 
+            'if' include[row, col] 'then' 
+                'begin' 
+                ndata := ndata + 1;
+                'if' firstcol = 0 'then' firstcol := col 'else' lastcol := col
+                'end';
+            'if' firstcol = 0 'then' faultexit(4) 'else' 
+            'if' firstcol = lastcol 'then' 
+                'begin' 
+                firstrow := 0;
+                'for' localrow := 1 'step' 1 'until' nrows 'do' 
+                'if' include[localrow, col] 'then' 
+                    'begin' 
+                    'if' firstrow = 0 'then' firstrow := localrow
+                        'else' lastrow := localrow
+                    'end';
+                'if' firstrow = 0 'then' faultexit(4) 'else' 
+                'if' firstrow = lastrow 'then' faultexit(5)
+                'end' 
+            'end' row;
+        'if' ndata < nrows + ncols + ('if' xfit 'then' 1 'else' 0) 
+            'then' faultexit(3);
+        'for' col := 1 'step' 1 'until' ncols 'do' 
+            'begin' 
+            firstrow := 0;
+            'for' row := 1 'step' 1 'until' nrows 'do' 
+            'if' include[row, col] 'and' firstrow = 0 'then' firstrow := row;
+            'if' firstrow = 0 'then' faultexit(4)
+            'end' col;
+        nsteps := 0; baseval := rxcval := 0.0;
+        'for' row := 1 'step' 1 'until' nrows 'do' rowval[row] := 0.0;
+        'for' col := 1 'step' 1 'until' ncols 'do' colval[col] := 0.0;
+        s0 := 0; sy := 0.0;
+        'for' row := 1 'step' 1 'until' nrows 'do' 
+        'for' col := 1 'step' 1 'until' ncols 'do' 
+        'if' include[row, col] 'then' 
+            'begin' 
+            s0 := s0 + 1; sy := sy + resval[row, col]
+            'end';
+        changeval := sy / s0; baseval := baseval + changeval;
+        ssval := 0.0;
+        'for' row := 1 'step' 1 'until' nrows 'do' 
+        'for' col := 1 'step' 1 'until' ncols 'do' 
+        'if' include[row, col] 'then' 
+            'begin' 
+            newres := resval[row, col] := resval[row, col] - changeval;
+            ssval := ssval + newres * newres
+            'end';
+        ifault := 0;
+        test('true', nsteps, ssval, evalue, ifault);
+        'if' ifault > 5 'then' faultexit(ifault)
+        'end' initcalc;
+
+    'procedure' addstep(i1, i2, ni1, ni2, i1levels);
+    'value' ni1, ni2; 'integer' i1, i2, ni1, ni2; 'real' 'array' i1levels;
+    'comment' Local procedure to perform a row or column step. Actual
+        substitutions for i1, i2 are row, col or col, row. Note that
+        parameters i1, i2 must be called by name;
+        'begin' 
+        ssval := 0.0;
+        'for' i1 := 1 'step' 1 'until' ni1 'do' 
+            'begin' 
+            s0 := 0; sy := 0.0;
+            'for' i2 := 1 'step' 1 'until' ni2 'do' 
+            'if' include[row, col] 'then' 
+                'begin' 
+                s0 := s0 + 1; sy := sy + resval[row, col]
+                'end' i2;
+            'if' s0 > 0 'then' 
+                'begin' 
+                changeval := sy / s0;
+                i1levels[i1] := i1levels[i1] + changeval;
+                'for' i2 := 1 'step' 1 'until' ni2 'do' 
+                'if' include[row, col] 'then' 
+                    'begin' 
+                    newres := resval[row, col] := resval[row, col] - changeval;
+                    ssval := ssval + newres * newres
+                    'end' i2
+                'end' 
+            'end' i1;
+        nsteps := nsteps + 1;
+        'if' test('false', nsteps, ssval, evalue, ifault) 'then' 'goto' rcdone;
+        'if' ifault > 5 'then' 'goto' exit
+        'end' addstep;
+
+    'procedure' rxccalc;
+    'comment' Local procedure to perform nonadditivity calculation;
+        'begin' 
+        s0 := 0; sx := sy := 0.0;
+        'for' row := 1 'step' 1 'until' nrows 'do' 
+        'for' col := 1 'step' 1 'until' ncols 'do' 
+        'if' include[row, col] 'then' 
+            'begin' 
+            s0 := s0 + 1;
+            sx := sx + rowval[row] * colval[col];
+            sy := sy + resval[row, col]
+            'end';
+        xm := sx / s0; ym := sy / s0;
+        sx2 := sxy := 0.0;
+        'for' row := 1 'step' 1 'until' nrows 'do' 
+        'for' col := 1 'step' 1 'until' ncols 'do' 
+        'if' include[row, col] 'then' 
+            'begin' 
+            rxctemp := rowval[row] * colval[col] - xm;
+            sx2 := sx2 + rxctemp * rxctemp;
+            sxy := sxy + rxctemp * (resval[row, col] - ym)
+            'end';
+        changeval := ym - xm * sxy / sx2
+        'end' rxccalc;
+
+    'comment' Start of action of procedure twoway;
+    'if' nrows < 1 'or' ncols < 1 'then' faultexit(1);
+    'if' init 'and' xfit 'and' 'not' rcfit 'then' faultexit(2);
+    'if' init 'then' initcalc 'else' 
+    'if' rcfit 'or' xfit 'then' 
+        'begin' 
+        'comment' Undo effect of any existing nonadditivity adjustment;
+        s0 := 0; sx := sy := 0.0;
+        'for' row := 1 'step' 1 'until' nrows 'do' 
+        'for' col := 1 'step' 1 'until' ncols 'do' 
+        'if' include[row, col] 'then' 
+        resval[row, col] := resval[row, col] + 
+            rxcval * rowval[row] * colval[col];
+        rxccalc;
+        baseval := baseval - changeval;
+        'for' row := 1 'step' 1 'until' nrows 'do' 
+        'for' col := 1 'step' 1 'until' ncols 'do' 
+        'if' include[row, col] 'then' 
+        resval[row, col] := resval[row, col] + changeval
+        'end';
+    'if' rcfit 'then' 
+        'begin' 
+        'comment' Fit for rows and columns alternately until fit 
+            criterion is satisfied;
+rcloop:
+        addstep(row, col, nrows, ncols, rowval);
+        addstep(col, row, ncols, nrows, colval);
+        'goto' rcloop
+        'end' row + col fit;
+rc done:
+    'if' xfit 'then' 
+        'begin' 
+        'comment' Apply nonadditive step;
+        rxccalc;
+        rxcval := sxy / sx2; ssval := 0.0;
+        baseval := baseval + changeval;
+        'for' row := 1 'step' 1 'until' nrows 'do' 
+        'for' col := 1 'step' 1 'until' ncols 'do' 
+        'if' include[row, col] 'then' 
+            'begin' 
+            resval[row, col] := newres := resval[row, col] - changeval
+                 - rxcval * rowval[row] * colval[col];
+            ssval := ssval + newres * newres
+            'end';
+        nsteps := nsteps + 1;
+        test('false', nsteps, ssval, evalue, ifault)
+        'end' row * col fit;
+exit:
+    'end' twoway;
+
+'procedure' ddplot(nrows, ncols, include, resval, baseval, rowval, 
+    colval, rxcval, rowxfit, colxfit, minx, maxx, miny, maxy, plotval);
+'comment' Algorithm AS 255.2  Appl. Statist. (1990) Vol.39, No.2;
+'value' nrows, ncols, baseval, rxcval, rowxfit, colxfit;
+'integer' nrows, ncols; 'real' baseval, rxcval, minx, maxx, miny, maxy;
+'Boolean' rowxfit, colxfit; 'Boolean' 'array' include;
+'real' 'array' resval, rowval, colval, plotval;
+    'comment' To produce a diagonal plot of the results of a 
+        two-way table analysis;
+    'begin' 'integer' row, col; 'real' temp, rc;
+    minx := maxx := 0.0; miny := maxy := baseval;
+    'for' row := 1 'step' 1 'until' nrows 'do' 
+    'for' col := 1 'step' 1 'until' ncols 'do' 
+        'begin' 
+        rc := rxcval * rowval[row] * colval[col];
+        temp := colval[col] - rowval[row];
+        'if' rowxfit 'then' 
+            'begin' 
+            'if' 'not' colxfit 'then' temp := temp - rc
+            'end' 
+        'else' 'if' colxfit 'then' temp := temp + rc;
+        'if' temp < minx 'then' minx := temp
+             'else' 'if' temp > maxx 'then' maxx := temp;
+        plotval[row, col, 1] := temp;
+        temp := baseval + rowval[row] + colval[col];
+        'if' rowxfit 'or' colxfit 'then' temp := temp + rc;
+        'if' temp < miny 'then' miny := temp
+             'else' 'if' temp > maxy 'then' maxy := temp;
+        plotval[row, col, 2] := temp;
+        'if' include[row, col] 'then' temp := temp + resval[row, col];
+        'if' temp < miny 'then' miny := temp
+             'else' 'if' temp > maxy 'then' maxy := temp;
+        plotval[row, col, 3] := temp
+        'end' 
+    'end' ddplot;
+
+'Boolean' 'procedure' testex(init, nsteps, ssval, evalue, ifault);
+'comment' Algorithm AS 255.3  Appl. Statist. (1990) Vol.39, No.2;
+'value' init, nsteps, sscal, evalue;
+'integer' nsteps, ifault; 'Boolean' init; 'real' ssval, evalue;
+    'comment' This particular implementation of the test procedure relies 
+        upon the ratio of the largest to the smallest of the 3 most 
+        recent values of ssvals[ ]. The stack is implemented as an own 
+        array variable. No use is made of the nsteps parameter;
+'if' ifault > 0 'then' testex := 'false' 'else' 
+    'begin' 'integer' i; 'own' 'real' 'array' ssvals[1:3];
+    'if' init 'then' 
+        'begin' 
+        'for' i := 1, 2, 3 'do' ssvals[i] := -1; testex := 'false' 
+        'end' 
+     'else' 'if' ssval < 0.0 'then' 
+        'begin' 
+        ifault := 6; testex := 'false' 
+        'end' 
+     'else' 
+        'begin' 'real' ssvalue, ssmax, ssmin;
+        'for' i := 3, 2 'do' ssvals[i] := ssvals[i - 1];
+        ssvals[1] := ssval;
+        ssmax := -1; ssmin := ssval;
+        'for' i := 1, 2, 3 'do' 
+            'begin' 
+            ssvalue := ssvals[i];
+            'if' ssvalue < 0.0 'then' 
+                'begin' 
+                testex := 'false' ; 'goto' exit
+                'end' 
+            'else' 'if' ssvalue < ssmin 'then' ssmin := ssvalue
+            'else' 'if' ssvalue > ssmax 'then' ssmax := ssvalue
+            'end' i;
+        testex := ssmax < ssmin * (1.0 + abs(evalue))
+        'end';
+exit:
+    'end' testex;

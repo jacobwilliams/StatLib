@@ -1,0 +1,220 @@
+      SUBROUTINE BABSRT(N, M, L, NN, SI, X, AVAIL, NBRNCH, POINTR, LIST,
+     *  INDEX, VSORT, XIN, CSORT, C, CMAX, S, CRIT, BEST, NEVAL,
+     *  IFAULT)
+C
+C        ALGORITHM AS233  APPL. STATIST. (1988) VOL. 37, NO. 1
+C
+C        BRANCH AND BOUND ALGORITHM FOR FEATURE SUBSET SELECTION
+C        USING SORTING TO IMPROVE EFFICIENCY
+C
+      INTEGER N, M, MBAR, P, OMIT, NOMIT, PI, VJ, PP
+      INTEGER LIST(N), NBRNCH(N), POINTR(N), INDEX(N), VSORT(N),
+     *  NEVAL(N), BEST(N)
+      LOGICAL AVAIL(N)
+      REAL SI(N, N), X(N), XIN(N), CSORT(N), C(N), S(NN), CMAX(N),
+     *  ZERO, TWO
+C
+      DATA ZERO, TWO /0.0, 2.0/
+C
+C        CHECK VALID VALUES OF L,M,N
+C
+      IFAULT = 1
+      IF (M .LT. 2 .OR. M .GE. N .OR. L .LT. 0) RETURN
+      IFAULT = 0
+C
+C        COPY SI INTO START OF WORKSPACE ARRAY S. EVALUATE
+C        CRITERION FUNCTION WITH ALL VARIABLES INCLUDED.
+C        INITIALIZE WORKSPACE ARRAYS.
+C
+      DOLD = ZERO
+      K = 0
+      DO 5 I = 1, N
+      DO 4 J = 1, I
+      K = K + 1
+      S(K) = SI(I, J)
+      DOLD = DOLD + TWO * S(K) * X(I) * X(J)
+    4 CONTINUE
+      DOLD = DOLD - S(K) * X(I) * X(I)
+      AVAIL(I) = .TRUE.
+      INDEX(I) = I
+      CMAX(I) = ZERO
+      NEVAL(I) = 0
+    5 CONTINUE
+C
+C        INITIALIZATION
+C
+      NN6 = 6 * NN
+      MBAR = N - M + 1
+      P = M + 1
+      I = 2
+      POINTR(1) = 0
+C
+C        COPY INTO XIN VALUES OF X FOR VARIABLES INCLUDED AT LEVEL I-1
+C
+  100 K = 0
+      DO 110 J = 1, N
+      IF (INDEX(J) .LT. 0) GOTO 110
+      K = K + 1
+      XIN(K) = X(J)
+  110 CONTINUE
+C
+C        EVALUATE CRITERION FUNCTION AFTER DROPPING EACH OF THE
+C        VARIABLES WHICH ARE CURRENTLY AVAILABLE.  UPDATE
+C        EVALUATION COUNTER.
+C
+      MM = N - I + 2
+      II = (NN6 - MM * (MM + 1) * (MM + 12)) / 6
+      K = 0
+      DO 130 OMIT = 1, N
+      IF (.NOT.AVAIL(OMIT)) GOTO 130
+      NOMIT = INDEX(OMIT)
+      KK = II + (NOMIT * NOMIT + NOMIT) / 2
+      IK = KK - NOMIT
+      D = ZERO
+      DO 120 J = 1, MM
+      IK = IK + I
+      IF (J .GT. NOMIT) IK = IK + J - 2
+      D = D + S(IK) * XIN(J)
+  120 CONTINUE
+      K = K + 1
+      CSORT(K) = DOLD - D * D / S(KK)
+      VSORT(K) = OMIT
+      NEVAL(I - 1) = NEVAL(I - 1) + 1
+  130 CONTINUE
+C
+C        SORT SMALLEST P VALUES INTO INCREASING ORDER
+C
+      PP = P
+      IF (K .EQ. P) PP = PP -1
+      DO 150 IK = 1, PP
+      J1 = IK
+      K1 = IK + 1
+      DO 140 J = K1, K
+      IF (CSORT(J) .LT. CSORT(J1)) J1 = J
+  140 CONTINUE
+      IF (J1 .EQ. IK) GOTO 150
+      TEMP = CSORT(IK)
+      CSORT(IK) = CSORT(J1)
+      CSORT(J1) = TEMP
+      ITEMP = VSORT(IK)
+      VSORT(IK) = VSORT(J1)
+      VSORT(J1) = ITEMP
+  150 CONTINUE
+C
+C        STORE NUMBERS OF VARIABLES SELECTED IN LIST AND CRITERION
+C        FUNCTION VALUES IN C. SIGNAL THAT THESE FEATURES ARE
+C        NO LONGER AVAILABLE.
+C
+      K = POINTR(I - 1)
+      DO 170 J = 1, P
+      K = K + 1
+      VJ = VSORT(J)
+      LIST(K) = VJ
+      C(K) = CSORT(J)
+      AVAIL(VJ) = .FALSE.
+      NBRNCH(K) = P - J + 1
+  170 CONTINUE
+      POINTR(I) = K + 1
+C
+C        BACKTRACK IF LIST AT LEVEL I IS EXHAUSTED OTHERWISE SELECT
+C        NEXT VARIABLE TO THE LEFT ALONG LIST
+C
+  200 IF (POINTR(I) .EQ. POINTR(I - 1) + 1) GOTO 400
+      POINTR(I) = POINTR(I) - 1
+C
+C        ABANDON FURTHER SEARCH IF CRITERION FUNCTION IS LESS THAN
+C        CURRENT MAXIMUM L LEVELS FURTHER DOWN TREE.
+C
+  300 PI = POINTR(I)
+      D = C(PI)
+      IF (D .GT. CMAX(I)) CMAX(I) = D
+      IL = I + L
+      IF (IL .GT. MBAR) IL = MBAR
+      IF (D .LT. CMAX(IL)) GOTO 600
+C
+C        IF AT LOWEST LEVEL OF TREE A NEW MAXIMUM HAS BEEN FOUND
+C
+      OMIT = LIST(PI)
+      IF (I .EQ. MBAR) GOTO 500
+C
+C        UPDATE INVERSE MATRIX S READY FOR MOVE TO NEXT LEVEL DOWN
+C
+      NOMIT = INDEX(OMIT)
+      MM = N - I + 2
+      II = (NN6 - MM * (MM + 1) * (MM + 2)) / 6
+      IJK = II + (MM * MM + MM) / 2
+      KK = II + (NOMIT * NOMIT + NOMIT) /2
+      IK = KK - NOMIT
+      IJ = II
+      DO 316 J = 1, MM
+      IK = IK + 1
+      IF (J - NOMIT) 304, 302, 303
+  302 IJ = IJ + NOMIT
+      GOTO 316
+  303 IK = IK + J - 2
+  304 JK = KK - NOMIT
+      TEMP = S(IK) / S(KK)
+      DO 310 K = 1, J
+      IJ = IJ + 1
+      JK = JK + 1
+      IF (K - NOMIT) 307, 310, 306
+  306 JK = JK + K - 1
+  307 IJK = IJK + 1
+      S(IJK) = S(IJ) - TEMP * S(JK)
+  310 CONTINUE
+  316 CONTINUE
+C
+C       UPDATE NUMBERING OF VARIABLES WITH RESPECT TO S
+C       AND MOVE DOWN TO NEXT LEVEL
+C
+      INDEX(OMIT) = -N
+      K = OMIT + 1
+      DO 330 J = K, N
+  330 INDEX(J) = INDEX(J) - 1
+      DOLD = D
+      P = NBRNCH(PI)
+      I = I + 1
+      GOTO 100
+C
+C        IF AT LEVEL 2 THEN SEARCH IS COMPLETE. OTHERWISE BACKTRACK
+C        ONE LEVEL
+C
+  400 IF (I .EQ. 2) GOTO 999
+      I = I - 1
+      PI = POINTR(I)
+      LPI = LIST(PI)
+      AVAIL(LPI) = .TRUE.
+      K = LPI + 1
+      DO 410 J = K, N
+  410 INDEX(J) = INDEX(J) + 1
+      INDEX(LPI) = 1
+      J = LPI
+  420 J = J - 1
+      IF (J .EQ. 0) GOTO 200
+      IF (INDEX(J) .LT. 0) GO TO 420
+      INDEX(LPI) = INDEX(J) + 1
+      GOTO 200
+C
+C        STORE VARIABLE NUMBERS OF SUBSET WHICH HAS PRODUCED NEW MAX
+C
+  500 K = 0
+      DO 510 J = 1, N
+      IF (INDEX(J) .LT. 0 .OR. J .EQ. OMIT) GOTO 510
+      K = K + 1
+      BEST(K) = J
+  510 CONTINUE
+C        
+C        SIGNAL THAT VARIABLE AT CURRENT NODE AND ITS LEFT SIBLINGS
+C        ARE AVAILABLE
+C
+  600 LPI = LIST(PI)
+      AVAIL(LPI) = .TRUE.
+      PI = PI - 1
+      IF (PI .GT. POINTR(I - 1)) GOTO 600
+      GOTO 400
+C
+C        SEARCH COMPLETE - SET MAXIMUM AND RETURN
+C
+  999 CRIT = CMAX(MBAR)
+      RETURN
+      END

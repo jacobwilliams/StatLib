@@ -1,0 +1,295 @@
+      SUBROUTINE COMBIN(S, IS, R, IR, N, ODMAX, DIMAX, WORKSP, IFAULT)
+C
+C        ALGORITHM AS 216 APPL. STATIST. (1985) VOL.34, NO.3
+C
+C        COMBINES THE CHOLESKI FACTORISATIONS OF OBSERVATIONS WITH
+C        POSITIVE WEIGHTS (S) AND NEGATIVE WEIGHTS (R) AND MAKES
+C        GILL-MURRAY MODIFICATION. ALSO FINDS MAXIMUM DIAGONAL AND
+C        OFF-DIAGONAL ELEMENTS OF HESSIAN.
+C
+      REAL S(IS), R(IR), WORKSP(N), ODMAX, DIMAX
+      REAL ZERO, EPS, ELEM, BETA2, SII, RII, CMAX, SIINEW, EI, A, W
+      DATA ZERO /0.0/, EPS /1.0E-8/
+C
+C        CHECK FOR VALID PARAMETERS
+C
+      IFAULT = 1
+      NNP1 = N * (N + 1) / 2
+      IF (N .LT. 2 .OR. IS .LT. NNP1 .OR. IR .LT. NNP1) RETURN
+      IFAULT = 0
+      NPARAM = N - 1
+C
+C        FIND MAXIMUM DIAG AND OFF-DIAG ELEMENTS
+C
+      ODMAX = ZERO
+      DIMAX = ZERO
+      IJ = NNP1 - N
+C
+C        LOOP FOR I = N-1 DOWN TO 1
+C
+      I = NPARAM
+C
+C        LOOP FOR J = I DOWN TO 1
+C
+   10 J = I
+      JJ = IJ
+   20 IF (J .LE. 0) GOTO 50
+      IF (I .EQ. J) ELEM = S(JJ) - R(JJ)
+      IF (I .NE. J) ELEM = S(JJ) * S(IJ) - R(JJ) * R(IJ)
+C
+C        LOOP FOR K = 1 UP TO (J-1)
+C
+      IF (J .EQ. 1) GOTO 40
+      KK = 0
+      IK = I * (I - 1) / 2
+      JMINUS = J - 1
+      JK = J * JMINUS / 2
+      DO 30 K = 1, JMINUS
+      KK = KK + K
+      IK = IK + 1
+      JK = JK + 1
+   30 ELEM = ELEM + S(IK) * S(JK) * S(KK) - R(IK) * R(JK) * R(KK)
+C
+   40 CONTINUE
+      IF (I .EQ. J) DIMAX = AMAX1(DIMAX, ABS(ELEM))
+      IF (I .NE. J) ODMAX = AMAX1(ODMAX, ABS(ELEM))
+      IJ = IJ - 1
+      JJ = JJ - J
+      J = J - 1
+      GOTO 20
+C
+   50 I = I - 1
+      IF (I .GT. 0) GOTO 10
+C
+C        COMBINE POSITIVE DEFINITE AND NEGATIVE DEFINITE COMPONENTS
+C
+      BETA2 = AMAX1(DIMAX, ODMAX / FLOAT(NPARAM), EPS)
+      II = 0
+      DO 130 I = 1, N
+C
+C        ALTER ITH ROW OF CHOLESKI S  ....
+C
+      II = II + I
+      SII = S(II)
+      RII = R(II)
+      IF (I .LT. N) GOTO 60
+      S(II) = SII - RII
+      RETURN
+   60 IF (RII .LE. ZERO) GOTO 130
+      DO 70 J = 1, I
+   70 WORKSP(J) = ZERO
+      IJ = II
+      CMAX = ZERO
+      IPLUS = I + 1
+      DO 80 J = IPLUS, N
+      IJ = IJ + J - 1
+      WORKSP(J) = S(IJ)
+      S(IJ) = S(IJ) * SII - R(IJ) * RII
+      IF (J .LT. N .AND. ABS(S(IJ)) .GT. CMAX) CMAX = ABS(S(IJ))
+   80 CONTINUE
+C
+      SIINEW = AMAX1(CMAX * CMAX / BETA2, ABS(SII - RII), EPS)
+      S(II) = SIINEW
+C
+C        .. IF GILL-MURRAY MODIFICATION IS NEEDED UPDATE REST OF S ..
+C
+      EI = SIINEW - SII * RII
+      A = SII / (SII + EI)
+      IJ = II
+      DO 90 J = IPLUS, N
+      IJ = IJ + J - 1
+      R(IJ) = R(IJ) - A * WORKSP(J)
+   90 S(IJ) = S(IJ) / SIINEW
+      IF (EI .LE. ZERO) GOTO 100
+      IFAULT = -1
+      W = EI * A
+      CALL UPDATE(S, WORKSP, W, N, IS)
+C
+C        .... THEN UPDATE REST OF R
+C
+  100 W = RII * (SII + EI) / SIINEW
+      DO 110 J = 1, I
+  110 WORKSP(J) = ZERO
+      IJ = II
+      DO 120 J = IPLUS, N
+      IJ = IJ + J - 1
+  120 WORKSP(J) = R(IJ)
+      CALL UPDATE(R, WORKSP, W, N, IR)
+  130 CONTINUE
+C
+      END
+
+      SUBROUTINE NUISNC(R, IR, NPARAM, DBDC, IDBDC, DC, DCDC, DIMAX,
+     *  ODMAX, WORKSP, IFAULT)
+C
+C        ALGORITHM AS 216.1 APPL. STATIST. (1985) VOL.34, NO.3
+C
+C
+C        INCORPORATES DERIVATIVES W.R.T A NUISANCE PARAMETER INTO THE
+C        HESSIAN AND GRADIENT WHOSE CHOLESKI FACTORISATION IS IN R AND
+C        MAKES GILL-MURRAY MODIFICATION TO GET POSITIVE-DEFINITE HESSIAN
+C
+      REAL R(IR), DBDC(IDBDC), WORKSP(NPARAM), DC, DCDC, DIMAX, ODMAX
+      REAL ZERO, EPS, ONE, BETA2, W, A, TEMP, B
+      DATA ZERO /0.0/, EPS /1.0E-7/, ONE /1.0/
+C
+C        CHECK FOR VALID PARAMETERS
+C
+      NPPLUS = NPARAM + 1
+      NPLESS = NPARAM - 1
+      L0 = NPARAM * NPPLUS / 2
+      IFAULT = 1
+      IF (NPARAM .LE. 1 .OR. L0 + NPPLUS .GT. IR .OR. IDBDC .LT. NPLESS)
+     *  RETURN
+      IFAULT = 0
+C
+C        COPY DERIVATIVES INTO R AFTER ELEMENTS OF KDK' AND UPDATE
+C        DIMAX AND ODMAX
+C
+      LI = L0
+      DO 10 I = 1, NPLESS
+      LI = LI + 1
+      ODMAX = AMAX1(ODMAX, ABS(DBDC(I)))
+   10 R(LI) = -DBDC(I)
+      R(LI + 1) = DC
+      DIMAX = AMAX1(DIMAX, ABS(DCDC))
+      BETA2 = AMAX1(DIMAX, ODMAX / NPARAM, EPS)
+C
+C        REPLACE EACH DERIVATIVE BY THE APPROPRIATE ELEMENT FROM THE
+C        REPRESENTATION OF MFM'
+C
+      LI = L0
+      IJ = 0
+      DO 50 I = 1, NPARAM
+      LI = LI + 1
+      IF (I .EQ. 1) GOTO 30
+      IMINUS = I - 1
+      LJ = L0
+      DO 20 J = 1, IMINUS
+      LJ = LJ + 1
+      IJ = IJ + 1
+   20 R(LI) = R(LI) - R(IJ) * R(LJ)
+   30 IJ = IJ + 1
+C
+C        ADD TO DIAGONAL OF HESSIAN TO MAKE IT POSITIVE DEFINITE, IF
+C        NECESSARY
+C
+      IF (I .EQ. NPARAM) GOTO 50
+      W = AMAX1(R(LI) * R(LI) / BETA2, ABS(R(IJ)), EPS) - R(IJ)
+      IF (W .LE. ZERO) GOTO 50
+      IFAULT = -1
+      DO 40 J = 1, NPARAM
+   40 WORKSP(J) = ZERO
+      WORKSP(I) = ONE
+      CALL UPDATE(R, WORKSP, W, NPARAM, L0)
+   50 CONTINUE
+C
+C        INTERCHANGE LAST TWO ROWS AND COLS OF MFM'
+C
+      A = -DCDC
+      LI = L0
+      KI = L0 - NPARAM
+      II = 0
+      DO 60 I = 1, NPLESS
+      LI = LI + 1
+      KI = KI + 1
+      II = II + I
+      TEMP = R(LI)
+      R(LI) = R(KI)
+      R(KI) = TEMP / R(II)
+   60 A = A - R(KI) * TEMP
+C
+      KI = KI + 1
+      B = R(KI)
+      IF (A .LT. EPS) IFAULT = -1
+      R(KI) = AMAX1(ABS(A), EPS)
+      LI = LI + 1
+      TEMP = R(LI)
+      R(LI) = TEMP / R(KI)
+      R(LI + 1) = B - TEMP * R(LI)
+C
+      RETURN
+      END
+      
+      SUBROUTINE STEP(R, IR, PARAMS, OLDLL, NPARAM, RIDGE, WORKSP, IW,
+     *  IFAULT)
+C
+C        ALGORITHM AS 216.2 APPL. STATIST. (1985) VOL.34, NO.3
+C
+C
+C        TAKES A POSITIVE DEFINITE MODIFIED HESSIAN AND USES MARQUARDT'S
+C        METHOD, INCREASING DIAGONAL UNTIL A LARGER LOG-LIKELIHOOD IS
+C        FOUND
+C
+      REAL R(IR), PARAMS(NPARAM), WORKSP(IW), OLDLL, RIDGE
+      REAL EPS, ZERO, ONE, C, ADDR, DIDIX, TEMP, W, ANEWLL
+C
+      DATA EPS /1.0E-7/, ZERO /0.0/, ONE /1.0/, C /10.0/
+      DATA MAXIT /10/
+C
+C        CHECK FOR VALID PARAMETERS
+C
+      IFAULT = 1
+      NPPLUS = NPARAM + 1
+      NRUSED = NPPLUS * (NPPLUS + 1) / 2
+      IF (NPARAM .LE. 0 .OR. IR .LT. NRUSED .OR. IW .LT. NPPLUS) RETURN
+      IFAULT = 0
+C
+      ITER = 1
+      IF (RIDGE .LE. ZERO) GOTO 50
+      IF (RIDGE .GE. EPS * C) RIDGE = RIDGE / C
+      ADDR = RIDGE
+C
+C        FIND DIAGONAL ELEMENTS OF HESSIAN ....
+C
+   10 IJ = 0
+      DO 40 I = 1, NPARAM
+      DIDIX = ZERO
+      JJ = 0
+      DO 20 J = 1, I
+      JJ = JJ + J
+      IJ = IJ + 1
+      TEMP = ONE
+      IF (I .NE. J) TEMP = R(IJ)
+   20 DIDIX = DIDIX + TEMP * TEMP * R(JJ)
+      IF (R(JJ) .LT. ZERO) GOTO 90
+C
+C        .... AND ADD TO THEM
+C
+      W = ADDR * DIDIX
+      DO 30 J = 1, NPPLUS
+   30 WORKSP(J) = ZERO
+      WORKSP(I) = ONE
+      CALL UPDATE(R, WORKSP, W, NPPLUS, IR)
+   40 CONTINUE
+C
+C        IF LIKELIHOOD IS NOT INCREASED, ADD BIGGER RIDGE TO HESSIAN
+C
+   50 CALL BSUB(R, IR, NPPLUS, WORKSP, IW, IFAIL)
+      DO 60 I = 1, NPARAM
+   60 WORKSP(I) = WORKSP(I) + PARAMS(I)
+      ANEWLL = ALLIKE(WORKSP, NPARAM)
+      IF (ANEWLL .GE. OLDLL) GOTO 70
+      ADDR = RIDGE * (C + ONE) / (ONE + RIDGE)
+      IF (RIDGE .GE. ZERO) RIDGE = RIDGE * C
+      ITER = ITER + 1
+      IFAULT = -1
+      IF (ITER .LE. MAXIT .AND. RIDGE .GT. ZERO) GOTO 10
+C
+C        TOO MANY ITERATIONS
+C
+      IFAULT = 2
+      RETURN
+C
+C        RETURN IMPROVED PARAMETERS
+C
+   70 OLDLL = ANEWLL
+      DO 80 I = 1, NPARAM
+   80 PARAMS(I) = WORKSP(I)
+      RETURN
+C
+C        HESSIAN NOT POSITIVE SEMI-DEFINITE ON INPUT
+C
+   90 IFAULT = 3
+      RETURN
+      END
