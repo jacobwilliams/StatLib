@@ -1,148 +1,148 @@
-This file contains:
-1. A Readme file provided by Charles Dunnett, the author of AS 251.
-2. The published algorithm AS 251 together with the two other AS algorithms
-   which it calls (AS 66 and AS 241).
-3. A driver program (MVTIN) for either multivariate normal or t.
-4. MVSTUD for calculating multivariate t probabilities.
-***************************************************************************
+! This file contains:
+! 1. A Readme file provided by Charles Dunnett, the author of AS 251.
+! 2. The published algorithm AS 251 together with the two other AS algorithms
+!    which it calls (AS 66 and AS 241).
+! 3. A driver program (MVTIN) for either multivariate normal or t.
+! 4. MVSTUD for calculating multivariate t probabilities.
+! ***************************************************************************
 
-Date: Mon, 10 Apr 1995 16:49:10 +0059 (EDT)
-From: "Charles W. Dunnett" <dunnett@mcmail.cis.mcmaster.ca>
-Subject: Readme for AS251 (extended version incl. multivariate t)
+! Date: Mon, 10 Apr 1995 16:49:10 +0059 (EDT)
+! From: "Charles W. Dunnett" <dunnett@mcmail.cis.mcmaster.ca>
+! Subject: Readme for AS251 (extended version incl. multivariate t)
 
-MVTIN is a driver program for computing multivariate normal or t
-probability integrals over arbitrary rectangular regions.  The
-correlation structure is assumed to be of product form, rho_ij =
-b_i x b_j, where -1 < b_i < +1.
+! MVTIN is a driver program for computing multivariate normal or t
+! probability integrals over arbitrary rectangular regions.  The
+! correlation structure is assumed to be of product form, rho_ij =
+! b_i x b_j, where -1 < b_i < +1.
 
-It requires the following:-
+! It requires the following:-
 
-    1.	 MVNPRD  (published as algorithm AS 251 in Applied
-      Statistics (1989), 38: 564-579; see also the correction
-      note in Applied Statistics (1993), 42: 709),
+!     1.	 MVNPRD  (published as algorithm AS 251 in Applied
+!       Statistics (1989), 38: 564-579; see also the correction
+!       note in Applied Statistics (1993), 42: 709),
 
-    2.	 ALNORM and PPND7 (published as algorithms AS 66 and
-      AS 241, respectively, in Applied Statistics, and
+!     2.	 ALNORM and PPND7 (published as algorithms AS 66 and
+!       AS 241, respectively, in Applied Statistics, and
 
-    3.	 MVSTUD   (which Studentizes MVNPRD).
+!     3.	 MVSTUD   (which Studentizes MVNPRD).
 
-Special cases of correlations which are of product form include
-the following:-
+! Special cases of correlations which are of product form include
+! the following:-
 
-  a) Equal correlations, rho >= 0.  Then b_i = sqrt(rho), all i.
+!   a) Equal correlations, rho >= 0.  Then b_i = sqrt(rho), all i.
 
-  b) Multiple comparisons between treatments and a specified
-treatment.  Then b_i = 1 / sqrt(1 + n_0/n_i), where n_0 and n_i
-are the sample sizes for the specified treatment and i-th
-treatment, respectively.
+!   b) Multiple comparisons between treatments and a specified
+! treatment.  Then b_i = 1 / sqrt(1 + n_0/n_i), where n_0 and n_i
+! are the sample sizes for the specified treatment and i-th
+! treatment, respectively.
 
-MVTIN computes 
+! MVTIN computes 
 
-      PROB  =  P{ B(I) < T_I < A(I), for I = 1,...,N }
+!       PROB  =  P{ B(I) < T_I < A(I), for I = 1,...,N }
 
-where (T_1,...,T_N) is a multivariate normal or t random variable
-with product correlation structure.  The B(I) may be -infinity or
-finite and the A(I) may be finite or +infinity.
+! where (T_1,...,T_N) is a multivariate normal or t random variable
+! with product correlation structure.  The B(I) may be -infinity or
+! finite and the A(I) may be finite or +infinity.
  
-The program can be used on any mainframe computer (such as a VAX)
-which has a Fortran compiler.  A PC can also be used, but the
-execution times will be much longer, especially for multivariate t
-integrals (unless your PC uses a 486 or faster chip).  Typical
-computing times for a multivariate t p-value range from about three
-minutes on an IBM/XT with math co-processor to 2.4 seconds on a
-486DX2/66 PC.
+! The program can be used on any mainframe computer (such as a VAX)
+! which has a Fortran compiler.  A PC can also be used, but the
+! execution times will be much longer, especially for multivariate t
+! integrals (unless your PC uses a 486 or faster chip).  Typical
+! computing times for a multivariate t p-value range from about three
+! minutes on an IBM/XT with math co-processor to 2.4 seconds on a
+! 486DX2/66 PC.
 
-The first time you use the program, it is recommended that you
-specify NDF = 0 (which denotes the multivariate normal case), since
-computing times are shorter than for multivariate t.
+! The first time you use the program, it is recommended that you
+! specify NDF = 0 (which denotes the multivariate normal case), since
+! computing times are shorter than for multivariate t.
 
-The accuracy is determined by the value of the parameter EPS, which
-has been pre-set to  EPS  =  0.0001.  For increased accuracy, you
-may change the value of EPS in the DATA statement of MVTIN to
-EPS = 0.00001 (Smaller values than this are not recommended).
+! The accuracy is determined by the value of the parameter EPS, which
+! has been pre-set to  EPS  =  0.0001.  For increased accuracy, you
+! may change the value of EPS in the DATA statement of MVTIN to
+! EPS = 0.00001 (Smaller values than this are not recommended).
 
-EXAMPLES:-
+! EXAMPLES:-
 
-(1) Suppose the problem is to determine g* such that
+! (1) Suppose the problem is to determine g* such that
 
-            P{min(Z1,...,Zk) > g*}
+!             P{min(Z1,...,Zk) > g*}
 
-         =  P{Z1 > g*, ... , Zk > g*}   = alpha
+!          =  P{Z1 > g*, ... , Zk > g*}   = alpha
 
-where Z1,...,Zk are N(0,1) with equal correlations, rho_ij = 0.5. 
-The first prompt you receive is for N and NDF. You enter the
-value of k for N, and 0 for NDF (indicating d.f.= infinity).  (At
-the end of each problem, the program returns to this prompt for
-the next problem.  If there is no further problem, enter 0 0 to
-exit from the program.)
+! where Z1,...,Zk are N(0,1) with equal correlations, rho_ij = 0.5. 
+! The first prompt you receive is for N and NDF. You enter the
+! value of k for N, and 0 for NDF (indicating d.f.= infinity).  (At
+! the end of each problem, the program returns to this prompt for
+! the next problem.  If there is no further problem, enter 0 0 to
+! exit from the program.)
 
-The next prompt is to specify the correlation structure.  You are
-given three choices: 1) equal correlations, 2) correlations defined
-from sample sizes as in b) above, and 3) unequal correlations of
-the form rho_ij = b_i x b_j.  For this example, enter 1, followed
-by 0.50 when you receive a prompt for rho.
+! The next prompt is to specify the correlation structure.  You are
+! given three choices: 1) equal correlations, 2) correlations defined
+! from sample sizes as in b) above, and 3) unequal correlations of
+! the form rho_ij = b_i x b_j.  For this example, enter 1, followed
+! by 0.50 when you receive a prompt for rho.
 
-Next you are asked whether you want equal or unequal limits.  Since
-all your limits are to be g* to +infinity, you specify equal
-limits.  You are also asked whether you want the central or non-
-central case: if the latter, you are asked to enter the value(s) of
-the non-centrality parameters.  
+! Next you are asked whether you want equal or unequal limits.  Since
+! all your limits are to be g* to +infinity, you specify equal
+! limits.  You are also asked whether you want the central or non-
+! central case: if the latter, you are asked to enter the value(s) of
+! the non-centrality parameters.  
 
-Then you are prompted to enter the values of INF and the limit(s). 
-You enter 0 (to indicate upper 1-sided) followed by a trial value
-for g*.
+! Then you are prompted to enter the values of INF and the limit(s). 
+! You enter 0 (to indicate upper 1-sided) followed by a trial value
+! for g*.
 
-After computing PROB, you have the option of entering new limits to
-obtain a new value of PROB, or returning to the beginning for a new
-problem.
+! After computing PROB, you have the option of entering new limits to
+! obtain a new value of PROB, or returning to the beginning for a new
+! problem.
 
-For example, for k = 5 and rho = 0.50, I found that g* = 0.564
-achieved the value alpha = 0.05.
+! For example, for k = 5 and rho = 0.50, I found that g* = 0.564
+! achieved the value alpha = 0.05.
 
-(2)  For the next example, consider a mc/control problem with
-sample sizes 11 for the control and 10, 10, 12, 10 and 9 for the
-treatment groups.  Here, k = 5 and d.f. = 56.  Suppose the largest
-of the t-statistics comparing treatments with the control has the
-value 2.50.  You want to determine its two-sided p-value, which is
-given by
+! (2)  For the next example, consider a mc/control problem with
+! sample sizes 11 for the control and 10, 10, 12, 10 and 9 for the
+! treatment groups.  Here, k = 5 and d.f. = 56.  Suppose the largest
+! of the t-statistics comparing treatments with the control has the
+! value 2.50.  You want to determine its two-sided p-value, which is
+! given by
 
-        p =  1 - P{ |T_1| < 2.5, ... , |T_5| < 2.5 }.
+!         p =  1 - P{ |T_1| < 2.5, ... , |T_5| < 2.5 }.
 
-At the prompt for N and NDF, enter: 5  56.
+! At the prompt for N and NDF, enter: 5  56.
 
-At the prompt for correlation structure: enter 2 to denote it is to
-be determined from the sample sizes, followed by the sample sizes
-at the next prompt.
+! At the prompt for correlation structure: enter 2 to denote it is to
+! be determined from the sample sizes, followed by the sample sizes
+! at the next prompt.
 
-At the prompt for equal or unequal limits, enter: 1.
+! At the prompt for equal or unequal limits, enter: 1.
 
-Enter 0 for the central case.
+! Enter 0 for the central case.
 
-Then for the value of INF and the limits, enter: 2 -2.50 2.50
+! Then for the value of INF and the limits, enter: 2 -2.50 2.50
 
-You should obtain the value PROB = .9375.  This is the probability
-for -2.50 < T_i < 2.50 (all i); then p-value = 1-.9375 = .0625.
-
-
-   Let me know if you encounter problems.  Also, please let me
-know if it does not meet your needs in some way, or if you think
-of any improvements.
-                  Good luck!
-
-                      With best wishes, Charles Dunnett.
+! You should obtain the value PROB = .9375.  This is the probability
+! for -2.50 < T_i < 2.50 (all i); then p-value = 1-.9375 = .0625.
 
 
+!    Let me know if you encounter problems.  Also, please let me
+! know if it does not meet your needs in some way, or if you think
+! of any improvements.
+!                   Good luck!
 
-* * * * * * * * * * * * * * * * * * * * * * * * * * * * 
-Professor Charles W. Dunnett
-Dept. of Mathematics and Statistics
-McMaster University
-Hamilton, Ontario L8S 4K1
-Canada.
-E-mail: dunnett@mcmaster.ca
-TEL: (905) 525-9140 (Extension 27104)
-FAX: (905) 522-0935
-* * * * * * * * * * * * * * * * * * * * * * * * * * * *
+!                       With best wishes, Charles Dunnett.
+
+
+
+! * * * * * * * * * * * * * * * * * * * * * * * * * * * * 
+! Professor Charles W. Dunnett
+! Dept. of Mathematics and Statistics
+! McMaster University
+! Hamilton, Ontario L8S 4K1
+! Canada.
+! E-mail: dunnett@mcmaster.ca
+! TEL: (905) 525-9140 (Extension 27104)
+! FAX: (905) 522-0935
+! * * * * * * * * * * * * * * * * * * * * * * * * * * * *
 
 
       SUBROUTINE MVNPRD(A, B, BPD, EPS, N, INF, IERC, HINC, PROB, BOUND,

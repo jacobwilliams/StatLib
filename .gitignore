@@ -1,0 +1,30 @@
+bin/
+lib/
+builds/
+build/
+install/
+doc/
+.vscode/
+/tmp
+
+*.gcov
+*.gcov.md*
+*.mod
+*.o
+*.obj
+*.manifest
+.sconsign.*
+files/*.json
+.cflags.*
+*.suo
+*.u2d
+*.user
+*.fdz
+
+# mac
+.DS_Store
+
+# misc:
+*.txt
+*.py
+*.pdf

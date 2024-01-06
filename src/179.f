@@ -1,25 +1,25 @@
-##### User Supplied Comment and Possible Correction #####
-  I think I've found a bug in routine 193 permut. There is an
-array overflow caused statement label "7", which currently reads
+! ##### User Supplied Comment and Possible Correction #####
+!   I think I've found a bug in routine 193 permut. There is an
+! array overflow caused statement label "7", which currently reads
 
-    7 do 8 j = 1,t
+!     7 do 8 j = 1,t
 
-t is equal to n at the end of the algorithm, therefore j 
-equals n.  However, the a(k,n) array is referenced in the following lines
-as a(i,j+1) which is outside the array bounds.
+! t is equal to n at the end of the algorithm, therefore j 
+! equals n.  However, the a(k,n) array is referenced in the following lines
+! as a(i,j+1) which is outside the array bounds.
 
-The correct line should read:
+! The correct line should read:
 
-    7 do 8 j = 1,t-1
+!     7 do 8 j = 1,t-1
 
-I've tested the change and the program appears to behave the same.  The
-program appeared to work previously but this relied on IFAULT being zero
-and immediately after A in memory.
+! I've tested the change and the program appears to behave the same.  The
+! program appeared to work previously but this relied on IFAULT being zero
+! and immediately after A in memory.
 
-cheers,
-Mark
-Mark Lakata <lakata@sseos.lbl.gov>
-##### 
+! cheers,
+! Mark
+! Mark Lakata <lakata@sseos.lbl.gov>
+! ##### 
 
       subroutine permut(n,k,r,a,ifault)
 c     

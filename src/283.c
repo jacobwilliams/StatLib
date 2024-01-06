@@ -1,18 +1,18 @@
-The file contains the following:
+// The file contains the following:
 
-fishfun.c  /* C-source of Fisher's symmetry test function  + driver program */
+// fishfun.c  /* C-source of Fisher's symmetry test function  + driver program */
 
-groupfun.c /* C source of Pitman's 2 sample test function + driver program */
+// groupfun.c /* C source of Pitman's 2 sample test function + driver program */
 
-fishint.c /* exact (integer) version of fishfun.c */
+// fishint.c /* exact (integer) version of fishfun.c */
 
-groupint.c /* exact (integer) version of groupfun.c */
+// groupint.c /* exact (integer) version of groupfun.c */
 
-psydata /* data file of Rutter score data for fishfun */
+// psydata /* data file of Rutter score data for fishfun */
 
-agedata /* data file of age data for groupfun */
+// agedata /* data file of age data for groupfun */
 
-iagedat /* integer version of age data */
+// iagedat /* integer version of age data */
 
 /* -----------------------------------------------------------------------*/
 /* fishfun.c */
